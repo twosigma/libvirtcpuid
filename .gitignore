@@ -1,0 +1,16 @@
+*.o
+*.so
+musl
+musl.tmp
+*.tmp
+src/linux/capflags.c
+build
+lcd_mask/features.json
+lcd_mask/features_gen
+lcd_mask/cpuid_data
+cpuid_tool/cpuid-*/cpuid
+cpuid_tool/cpuid-*/cpuid.man.gz
+cpuid_tool/cpuid-*/cpuinfo2cpuid.man
+cpuid_tool/cpuid-*/cpuinfo2cpuid.man.gz
+cpuid
+src/config.h
