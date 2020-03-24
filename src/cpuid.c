@@ -26,6 +26,7 @@
 #include <err.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #include "syscalls.h"
 #include "cpuid.h"
@@ -49,12 +50,12 @@ uint32_t cpuid_mask[NCAPINTS];
 
 static void mask_cpuid_feature(int feature)
 {
-	cpuid_mask[feature/32] |= (1 << (feature % 32));
+    cpuid_mask[feature/32] |= (1 << (feature % 32));
 }
 
 static bool is_cpuid_feature_masked(int feature)
 {
-	return !!(cpuid_mask[feature/32] & (1 << (feature % 32)));
+    return !!(cpuid_mask[feature/32] & (1 << (feature % 32)));
 }
 
 /*
@@ -63,168 +64,168 @@ static bool is_cpuid_feature_masked(int feature)
  */
 static bool has_feature_register_mask(int feature)
 {
-	return !!reverse_cpuid[feature/32].leaf;
+    return !!reverse_cpuid[feature/32].leaf;
 }
 
 static void show_help_and_die(void)
 {
-	printf("VIRT_CPUID_MASK recognizes the following features:\n");
+    printf("VIRT_CPUID_MASK recognizes the following features:\n");
 
-	for (int feature = 0; feature < NCAPINTS*32; feature++) {
-		const char *name = x86_cap_flags[feature];
-		if (name && has_feature_register_mask(feature))
-			printf("%s\n", name);
-	}
-	exit(0);
+    for (int feature = 0; feature < NCAPINTS*32; feature++) {
+        const char *name = x86_cap_flags[feature];
+        if (name && has_feature_register_mask(feature))
+            printf("%s\n", name);
+    }
+    exit(0);
 }
 
 static int find_cpuid_feature(const char *feature_name)
 {
-	for (int feature = 0; feature < NCAPINTS*32; feature++) {
-		const char *name = x86_cap_flags[feature];
-		if (name && !strcmp(name, feature_name) &&
-		    has_feature_register_mask(feature))
-			return feature;
-	}
-	return -1;
+    for (int feature = 0; feature < NCAPINTS*32; feature++) {
+        const char *name = x86_cap_flags[feature];
+        if (name && !strcmp(name, feature_name) &&
+            has_feature_register_mask(feature))
+            return feature;
+    }
+    return -1;
 }
 
 static void enable_feature_mask(const char *name)
 {
 #define XSAVEAREA "xsavearea="
-	if (!strncmp(name, XSAVEAREA, sizeof(XSAVEAREA)-1)) {
-		xsavearea_size = atoi(name+sizeof(XSAVEAREA)-1);
-		debug("Setting xsavearea=%d", xsavearea_size);
-		return;
-	}
+    if (!strncmp(name, XSAVEAREA, sizeof(XSAVEAREA)-1)) {
+        xsavearea_size = atoi(name+sizeof(XSAVEAREA)-1);
+        debug("Setting xsavearea=%d", xsavearea_size);
+        return;
+    }
 
-	if (!strcmp(name, "avx512"))
-		name = "avx512f";
+    if (!strcmp(name, "avx512"))
+        name = "avx512f";
 
-	int feature = find_cpuid_feature(name);
-	if (feature == -1) {
-		if (!strcmp(name, "help"))
-			show_help_and_die();
-		errx(1, "Unrecognized cpu feature flag: %s", name);
-	}
+    int feature = find_cpuid_feature(name);
+    if (feature == -1) {
+        if (!strcmp(name, "help"))
+            show_help_and_die();
+        errx(1, "Unrecognized cpu feature flag: %s", name);
+    }
 
-	mask_cpuid_feature(feature);
+    mask_cpuid_feature(feature);
 }
 
 static void mask_dependent_features(void)
 {
-	/*
-	 * This is useful for example when the user masks avx512f. We should
-	 * ensure in this case that the avx512 friends (e.g., avx512cd,
-	 * avx512dq) get masked as well.
-	 */
+    /*
+     * This is useful for example when the user masks avx512f. We should
+     * ensure in this case that the avx512 friends (e.g., avx512cd,
+     * avx512dq) get masked as well.
+     */
 
-	bool changed;
-	do {
-		changed = false;
-		for (const struct cpuid_dep *d = cpuid_deps; d->feature; d++) {
-			if (is_cpuid_feature_masked(d->depends) &&
-			    !is_cpuid_feature_masked(d->feature)) {
-				mask_cpuid_feature(d->feature);
-				changed = true;
-			}
-		}
-	} while (changed);
+    bool changed;
+    do {
+        changed = false;
+        for (const struct cpuid_dep *d = cpuid_deps; d->feature; d++) {
+            if (is_cpuid_feature_masked(d->depends) &&
+                !is_cpuid_feature_masked(d->feature)) {
+                mask_cpuid_feature(d->feature);
+                changed = true;
+            }
+        }
+    } while (changed);
 }
 
 static void init_cpuid_mask(const char *_conf)
 {
-	size_t len = strlen(_conf);
-	char conf[len+1];
+    size_t len = strlen(_conf);
+    char conf[len+1];
 
-	for (int i = 0; i < len+1; i++)
-		conf[i] = tolower((unsigned int)_conf[i]);
+    for (int i = 0; i < len+1; i++)
+        conf[i] = tolower((unsigned int)_conf[i]);
 
-	char *saveptr;
-	const char *sep = ",";
-	for (char *tok = strtok_r(conf, sep, &saveptr); tok; tok = strtok_r(NULL, sep, &saveptr))
-		enable_feature_mask(tok);
+    char *saveptr;
+    const char *sep = ",";
+    for (char *tok = strtok_r(conf, sep, &saveptr); tok; tok = strtok_r(NULL, sep, &saveptr))
+        enable_feature_mask(tok);
 
-	mask_dependent_features();
+    mask_dependent_features();
 }
 
 static int get_next_matching_leaf_index(uint32_t leaf, uint32_t subleaf, int from_index)
 {
-	if (leaf == 0)
-		return -1;
+    if (leaf == 0)
+        return -1;
 
-	for (int i = from_index; i < NCAPINTS; i++) {
-		if (reverse_cpuid[i].leaf == leaf &&
-		    (reverse_cpuid[i].subleaf == SL_UNUSED ||
-		     reverse_cpuid[i].subleaf == subleaf))
-			return i;
-	}
+    for (int i = from_index; i < NCAPINTS; i++) {
+        if (reverse_cpuid[i].leaf == leaf &&
+            (reverse_cpuid[i].subleaf == SL_UNUSED ||
+             reverse_cpuid[i].subleaf == subleaf))
+            return i;
+    }
 
-	return -1;
+    return -1;
 }
 
 static void virtualize_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_regs *regs)
 {
-	if (leaf == 0x0d && subleaf == 0 && xsavearea_size != -1) {
-		debug("Overriding xsavearea=%d", xsavearea_size);
-		if (regs->ebx && xsavearea_size && regs->ebx > xsavearea_size)
-			errx(1, "xsavearea_size is too small."
-			     "It should be at least %d bytes", regs->ebx);
+    if (leaf == 0x0d && subleaf == 0 && xsavearea_size != -1) {
+        debug("Overriding xsavearea=%d", xsavearea_size);
+        if (regs->ebx && xsavearea_size && regs->ebx > xsavearea_size)
+            errx(1, "xsavearea_size is too small."
+                 "It should be at least %d bytes", regs->ebx);
 
-		regs->ebx = xsavearea_size;
-		regs->ecx = xsavearea_size;
-	}
+        regs->ebx = xsavearea_size;
+        regs->ecx = xsavearea_size;
+    }
 
-	for (int i = 0; ; i++) {
-		i = get_next_matching_leaf_index(leaf, subleaf, i);
-		if (i == -1)
-			break;
+    for (int i = 0; ; i++) {
+        i = get_next_matching_leaf_index(leaf, subleaf, i);
+        if (i == -1)
+            break;
 
-		switch (reverse_cpuid[i].reg) {
-			case CPUID_EAX: regs->eax &= ~cpuid_mask[i]; break;
-			case CPUID_EBX: regs->ebx &= ~cpuid_mask[i]; break;
-			case CPUID_ECX: regs->ecx &= ~cpuid_mask[i]; break;
-			case CPUID_EDX: regs->edx &= ~cpuid_mask[i]; break;
-		}
-	}
+        switch (reverse_cpuid[i].reg) {
+            case CPUID_EAX: regs->eax &= ~cpuid_mask[i]; break;
+            case CPUID_EBX: regs->ebx &= ~cpuid_mask[i]; break;
+            case CPUID_ECX: regs->ecx &= ~cpuid_mask[i]; break;
+            case CPUID_EDX: regs->edx &= ~cpuid_mask[i]; break;
+        }
+    }
 }
 
 static inline void cpuid(uint32_t leaf, uint32_t subleaf,
-			 uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+                         uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-	__asm__ ("cpuid"
-		 : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-		 : "0" (leaf), "2" (subleaf)
-		 : "memory");
+    __asm__ ("cpuid"
+             : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+             : "0" (leaf), "2" (subleaf)
+             : "memory");
 }
 
 #define UCTX_REG(uctx, reg)	((ucontext_t *)uctx)->uc_mcontext.gregs[REG_R##reg]
 
 static void cpuid_handle_trap(void *uctx)
 {
-	uint32_t leaf    = UCTX_REG(uctx, AX);
-	uint32_t subleaf = UCTX_REG(uctx, CX);
-	struct cpuid_regs regs;
+    uint32_t leaf    = UCTX_REG(uctx, AX);
+    uint32_t subleaf = UCTX_REG(uctx, CX);
+    struct cpuid_regs regs;
 
-	debug("Intercepted call to CPUID, leaf=0x%08x subleaf=%d", leaf, subleaf);
+    debug("Intercepted call to CPUID, leaf=0x%08x subleaf=%d", leaf, subleaf);
 
-	/*
-	 * Disabling CPUID faulting temporarily for the current thread.
-	 */
-	if (arch_prctl(ARCH_SET_CPUID, 1) < 0)
-		err(1, "Failed to disable CPUID faulting");
+    /*
+     * Disabling CPUID faulting temporarily for the current thread.
+     */
+    if (arch_prctl(ARCH_SET_CPUID, 1) < 0)
+        err(1, "Failed to disable CPUID faulting");
 
-	cpuid(leaf, subleaf, &regs.eax, &regs.ebx, &regs.ecx, &regs.edx);
-	if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
-		err(1, "Failed to re-enable CPUID faulting");
+    cpuid(leaf, subleaf, &regs.eax, &regs.ebx, &regs.ecx, &regs.edx);
+    if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
+        err(1, "Failed to re-enable CPUID faulting");
 
-	virtualize_cpuid(leaf, subleaf, &regs);
+    virtualize_cpuid(leaf, subleaf, &regs);
 
-	UCTX_REG(uctx, IP) += 2; /* size of CPUID opcode */
-	UCTX_REG(uctx, AX) = regs.eax;
-	UCTX_REG(uctx, BX) = regs.ebx;
-	UCTX_REG(uctx, CX) = regs.ecx;
-	UCTX_REG(uctx, DX) = regs.edx;
+    UCTX_REG(uctx, IP) += 2; /* size of CPUID opcode */
+    UCTX_REG(uctx, AX) = regs.eax;
+    UCTX_REG(uctx, BX) = regs.ebx;
+    UCTX_REG(uctx, CX) = regs.ecx;
+    UCTX_REG(uctx, DX) = regs.edx;
 }
 
 /*
@@ -236,61 +237,61 @@ static void cpuid_handle_trap(void *uctx)
 #define CPUID_OPCODE 0xa20f
 static bool sigsegv_handler(int signal, siginfo_t *info, void *uctx)
 {
-	if (info->si_code != SI_KERNEL)
-		return false;
+    if (info->si_code != SI_KERNEL)
+        return false;
 
-	if (*(uint16_t *)UCTX_REG(uctx, IP) != CPUID_OPCODE)
-		return false;
+    if (*(uint16_t *)UCTX_REG(uctx, IP) != CPUID_OPCODE)
+        return false;
 
-	cpuid_handle_trap(uctx);
-	return true;
+    cpuid_handle_trap(uctx);
+    return true;
 }
 
 static void setup_sigsegv_cpuid_handler(void)
 {
-	struct sigaction sa = {
-		.sa_sigaction = (void *)sigsegv_handler,
-		.sa_flags = SA_SIGINFO,
-	};
+    struct sigaction sa = {
+        .sa_sigaction = (void *)sigsegv_handler,
+        .sa_flags = SA_SIGINFO,
+    };
 
-	if (sigaction(SIGSEGV, &sa, NULL) < 0)
-		err(1, "Failed to register SIGSEGV handler");
+    if (sigaction(SIGSEGV, &sa, NULL) < 0)
+        err(1, "Failed to register SIGSEGV handler");
 
-	sigset_t sigset;
-	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGSEGV);
-	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) < 0)
-		err(1, "Failed to unblock SIGSEGV");
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGSEGV);
+    if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) < 0)
+        err(1, "Failed to unblock SIGSEGV");
 }
 
-void cpuid_init()
+void cpuid_init(void)
 {
-	emit_debug = getenv("VIRT_CPUID_DEBUG");
+    emit_debug = getenv("VIRT_CPUID_DEBUG");
 
-	char *conf = getenv("VIRT_CPUID_MASK");
-	if (!conf) {
-		debug("VIRT_CPUID_MASK not set. Skipping virtualization");
-		return;
-	}
+    char *conf = getenv("VIRT_CPUID_MASK");
+    if (!conf) {
+        debug("VIRT_CPUID_MASK not set. Skipping virtualization");
+        return;
+    }
 
-	if (!strcmp(conf, "help"))
-		show_help_and_die();
+    if (!strcmp(conf, "help"))
+        show_help_and_die();
 
-	bool faulting_disabled;
-	if ((faulting_disabled = arch_prctl(ARCH_GET_CPUID, 0)) < 0)
-		err(1, "CPUID faulting feature inaccessible");
+    bool faulting_disabled;
+    if ((faulting_disabled = arch_prctl(ARCH_GET_CPUID, 0)) < 0)
+        err(1, "CPUID faulting feature inaccessible");
 
-	/*
-	 * When the DSO loads, it calls cpuid_init(). This is to support
-	 * running without the loader. So we check if we already have
-	 * the faulting feature enabled.
-	 */
-	if (!faulting_disabled)
-		return;
+    /*
+     * When the DSO loads, it calls cpuid_init(). This is to support
+     * running without the loader. So we check if we already have
+     * the faulting feature enabled.
+     */
+    if (!faulting_disabled)
+        return;
 
-	init_cpuid_mask(conf);
-	setup_sigsegv_cpuid_handler();
+    init_cpuid_mask(conf);
+    setup_sigsegv_cpuid_handler();
 
-	if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
-		err(1, "Failed to enable CPUID faulting");
+    if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
+        err(1, "Failed to enable CPUID faulting");
 }

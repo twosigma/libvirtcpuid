@@ -23,17 +23,17 @@
 
 static inline int tgkill(int tgid, int tid, int sig)
 {
-	return syscall(SYS_tgkill, tgid, tid, sig);
+    return syscall(SYS_tgkill, tgid, tid, sig);
 }
 
-static inline int gettid()
+static inline int gettid(void)
 {
-	return syscall(SYS_gettid);
+    return syscall(SYS_gettid);
 }
 
 static inline int arch_prctl(int code, unsigned long addr)
 {
-	return syscall(SYS_arch_prctl, code, addr);
+    return syscall(SYS_arch_prctl, code, addr);
 }
 
 #ifndef ARCH_GET_CPUID

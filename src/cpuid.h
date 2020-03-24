@@ -19,6 +19,6 @@
 #ifndef __CPUID_H__
 #define __CPUID_H__
 
-void cpuid_init();
+void cpuid_init(void);
 
 #endif /* __CPUID_H__ */
