@@ -1,5 +1,7 @@
 INTERPOSED_LD_PATH ?= /lib64/ld-linux-x86-64.so.2.orig
 LD_INJECT_ENV_PATH ?= /etc/ld-inject.env
+MUSL_VERSION ?= 1.1.24
+MUSL_ARCHIVE ?= musl-$(MUSL_VERSION).tar.gz
 
 # We build both a loader and a shared library (DSO)
 
@@ -69,10 +71,13 @@ build/ld:
 build/dso:
 	mkdir -p $@
 
-musl:
+$(MUSL_ARCHIVE):
+	wget https://www.musl-libc.org/releases/$@
+
+musl: $(MUSL_ARCHIVE)
 	rm -rf musl.tmp
 	mkdir musl.tmp
-	wget -O - https://www.musl-libc.org/releases/musl-1.1.24.tar.gz | tar xzf - -C musl.tmp --strip-components=1
+	tar xzf $(MUSL_ARCHIVE) -C musl.tmp --strip-components=1
 	mv musl.tmp musl
 
 musl/lib/libc.a: musl
