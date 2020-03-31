@@ -56,9 +56,18 @@ def extract_machine_features(cpuid_results, reg_features_lut):
             if reg_feature_defs is None:
                 continue
 
+            recognized_feature_bits = set()
+
             for feature in reg_feature_defs:
+                recognized_feature_bits.add(feature['bit'])
                 if reg_data & (1<<feature['bit']):
                     machine['features'].add(feature['name'])
+
+            for bit in range(32):
+                if bit in recognized_feature_bits:
+                    continue
+                if reg_data & (1<<bit):
+                    machine['features'].add("{:x}_{:x}_{}_{}".format(*list(key), bit))
 
     return machine
 
@@ -106,7 +115,7 @@ def simplify_mask(mask, feature_defs):
 
     new_mask = set()
     for m in mask:
-        dep = feature_deps[m]
+        dep = feature_deps.get(m, set())
         if dep not in mask:
             new_mask.add(m)
 

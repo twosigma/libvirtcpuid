@@ -10,8 +10,6 @@
 # Generate the x86_cap/bug_flags[] arrays from include/asm/cpufeatures.h
 #
 
-# We grab the "" names
-
 set -e
 
 IN=$1
@@ -39,7 +37,10 @@ dump_array()
 		# If the /* comment */ starts with a quote string, grab that.
 		VALUE="$(echo "$i" | sed -n 's@.*/\* *\("[^"]*"\).*\*/@\1@p')"
 		[ -z "$VALUE" ] && VALUE="\"$NAME\""
+		# Note: In the cpufeatures.h, names of "" are skipped.
+		# We don't want to skip them.
 		#[ "$VALUE" = '""' ] && continue
+		[ "$VALUE" = '""' ] && VALUE="\"$NAME\""
 
 		# Name is uppercase, VALUE is all lowercase
 		VALUE="$(echo "$VALUE" | tr A-Z a-z)"

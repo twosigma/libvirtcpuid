@@ -64,8 +64,33 @@ static bool suppress_output;
 uint32_t xsavearea_size = -1;
 uint32_t cpuid_mask[NCAPINTS];
 
+static enum cpuid_regs_idx get_reg_from_name(const char *regname)
+{
+    if (!strcmp(regname, "eax")) return CPUID_EAX;
+    if (!strcmp(regname, "ebx")) return CPUID_EBX;
+    if (!strcmp(regname, "ecx")) return CPUID_ECX;
+    if (!strcmp(regname, "edx")) return CPUID_EDX;
+    return -1;
+}
+
+static const char* get_regname(enum cpuid_regs_idx reg)
+{
+    switch (reg) {
+        case CPUID_EAX: return "eax";
+        case CPUID_EBX: return "ebx";
+        case CPUID_ECX: return "ecx";
+        case CPUID_EDX: return "edx";
+        default: return NULL;
+    }
+}
+
 static void mask_cpuid_feature(int feature)
 {
+    if (emit_debug) {
+        const struct cpuid_reg *lr = &reverse_cpuid[feature/32];
+        debug("masking leaf=0x%08x subleaf=0x%02x reg=%s bit=%d",
+              lr->leaf, lr->subleaf, get_regname(lr->reg), feature%32);
+    }
     cpuid_mask[feature/32] |= (1 << (feature % 32));
 }
 
@@ -83,6 +108,34 @@ static bool has_feature_register_mask(int feature)
     return !!reverse_cpuid[feature/32].leaf;
 }
 
+static int get_next_matching_leaf_index(uint32_t leaf, uint32_t subleaf, int from_index)
+{
+    if (leaf == 0)
+        return -1;
+
+    for (int i = from_index; i < NCAPINTS; i++) {
+        if (reverse_cpuid[i].leaf == leaf &&
+            (reverse_cpuid[i].subleaf == SL_UNUSED ||
+             reverse_cpuid[i].subleaf == subleaf))
+            return i;
+    }
+
+    return -1;
+}
+
+static int get_leaf_reg_index(uint32_t leaf, uint32_t subleaf, enum cpuid_regs_idx reg)
+{
+    int i;
+
+    for (i = get_next_matching_leaf_index(leaf, subleaf, 0); i >= 0;
+         i = get_next_matching_leaf_index(leaf, subleaf, i+1)) {
+        if (reverse_cpuid[i].reg == reg)
+            return i;
+    }
+
+    return -1;
+}
+
 static void show_help_and_die(void)
 {
     printf("VIRT_CPUID_MASK recognizes the following features:\n");
@@ -95,15 +148,44 @@ static void show_help_and_die(void)
     exit(0);
 }
 
+static int find_cpuid_feature_generic(const char *feature_name)
+{
+    uint32_t leaf, subleaf;
+    char regname[4];
+    int leaf_index;
+    int reg;
+    unsigned int bit;
+
+    if (sscanf(feature_name, "%x_%x_%3[^_]_%u", &leaf, &subleaf, regname, &bit) != 4)
+        return -1;
+
+    reg = get_reg_from_name(regname);
+    if (reg == -1)
+        return -1;
+
+    if (bit > 31)
+        return -1;
+
+    leaf_index = get_leaf_reg_index(leaf, subleaf, reg);
+    if (leaf_index == -1)
+        return -1;
+
+    return leaf_index * 32 + bit;
+}
+
 static int find_cpuid_feature(const char *feature_name)
 {
+    if (!strcmp(feature_name, "avx512"))
+        feature_name = "avx512f";
+
     for (int feature = 0; feature < NCAPINTS*32; feature++) {
         const char *name = x86_cap_flags[feature];
         if (name && !strcmp(name, feature_name) &&
             has_feature_register_mask(feature))
             return feature;
     }
-    return -1;
+
+    return find_cpuid_feature_generic(feature_name);
 }
 
 static void enable_feature_mask(const char *name)
@@ -114,9 +196,6 @@ static void enable_feature_mask(const char *name)
         debug("Setting xsavearea=%d", xsavearea_size);
         return;
     }
-
-    if (!strcmp(name, "avx512"))
-        name = "avx512f";
 
     int feature = find_cpuid_feature(name);
     if (feature == -1) {
@@ -165,23 +244,10 @@ static void init_cpuid_mask(const char *_conf)
     mask_dependent_features();
 }
 
-static int get_next_matching_leaf_index(uint32_t leaf, uint32_t subleaf, int from_index)
-{
-    if (leaf == 0)
-        return -1;
-
-    for (int i = from_index; i < NCAPINTS; i++) {
-        if (reverse_cpuid[i].leaf == leaf &&
-            (reverse_cpuid[i].subleaf == SL_UNUSED ||
-             reverse_cpuid[i].subleaf == subleaf))
-            return i;
-    }
-
-    return -1;
-}
-
 static void virtualize_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_regs *regs)
 {
+    int i;
+
     if (leaf == 0x0d && subleaf == 0 && xsavearea_size != -1) {
         debug("Overriding xsavearea=%d", xsavearea_size);
         if (regs->ebx && xsavearea_size && regs->ebx > xsavearea_size)
@@ -192,11 +258,8 @@ static void virtualize_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_regs 
         regs->ecx = xsavearea_size;
     }
 
-    for (int i = 0; ; i++) {
-        i = get_next_matching_leaf_index(leaf, subleaf, i);
-        if (i == -1)
-            break;
-
+    for (i = get_next_matching_leaf_index(leaf, subleaf, 0); i >= 0;
+         i = get_next_matching_leaf_index(leaf, subleaf, i+1)) {
         switch (reverse_cpuid[i].reg) {
             case CPUID_EAX: regs->eax &= ~cpuid_mask[i]; break;
             case CPUID_EBX: regs->ebx &= ~cpuid_mask[i]; break;

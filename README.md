@@ -212,32 +212,40 @@ features which are present on all tested hosts.
 libvirtcpuid recognizes the following CPU features:
 
 `3dnow`, `3dnowext`, `3dnowprefetch`, `abm`, `ace`, `ace2`, `ace2_en`, `ace_en`,
-`acpi`, `adx`, `aes`, `apic`, `arat`, `arch_capabilities`, `avic`, `avx`,
-`avx2`, `avx512_4fmaps`, `avx512_4vnniw`, `avx512_bf16`, `avx512_bitalg`,
-`avx512bw`, `avx512cd`, `avx512dq`, `avx512er`, `avx512f`, `avx512ifma`,
-`avx512pf`, `avx512vbmi`, `avx512_vbmi2`, `avx512vl`, `avx512_vnni`,
-`avx512_vp2intersect`, `avx512_vpopcntdq`, `bmi1`, `bmi2`, `bpext`, `cid`,
-`cldemote`, `clflush`, `clflushopt`, `clwb`, `clzero`, `cmov`, `cmp_legacy`,
-`cqm`, `cr8_legacy`, `cx16`, `cx8`, `dca`, `de`, `decodeassists`, `ds_cpl`,
-`dtes64`, `dtherm`, `dts`, `erms`, `est`, `extapic`, `f16c`, `flushbyasid`,
-`flush_l1d`, `fma`, `fma4`, `fpu`, `fsgsbase`, `fxsr`, `fxsr_opt`, `gfni`,
-`hle`, `ht`, `hwp`, `hwp_act_window`, `hwp_epp`, `hwp_notify`, `hwp_pkg_req`,
-`hypervisor`, `ia64`, `ibs`, `ida`, `intel_pt`, `invpcid`, `irperf`, `la57`,
-`lahf_lm`, `lbrv`, `lm`, `longrun`, `lrti`, `lwp`, `mca`, `mce`, `md_clear`,
-`misalignsse`, `mmx`, `mmxext`, `monitor`, `movbe`, `movdir64b`, `movdiri`,
-`mp`, `mpx`, `msr`, `mtrr`, `mwaitx`, `nodeid_msr`, `npt`, `nrip_save`, `nx`,
-`ospke`, `osvw`, `overflow_recov`, `pae`, `pat`, `pausefilter`, `pbe`, `pcid`,
+`acpi`, `adx`, `aes`, `amd_ibpb`, `amd_ibrs`, `amd_ppin`, `amd_ssbd`,
+`amd_ssb_no`, `amd_stibp`, `amd_stibp_always_on`, `apic`, `arat`,
+`arch_capabilities`, `avic`, `avx`, `avx2`, `avx512_4fmaps`, `avx512_4vnniw`,
+`avx512_bf16`, `avx512_bitalg`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512er`,
+`avx512f`, `avx512ifma`, `avx512pf`, `avx512vbmi`, `avx512_vbmi2`, `avx512vl`,
+`avx512_vnni`, `avx512_vp2intersect`, `avx512_vpopcntdq`, `bmi1`, `bmi2`,
+`bpext`, `cid`, `cldemote`, `clflush`, `clflushopt`, `clwb`, `clzero`, `cmov`,
+`cmp_legacy`, `core_capabilities`, `cqm`, `cr8_legacy`, `cx16`, `cx8`, `dca`,
+`de`, `decodeassists`, `ds_cpl`, `dtes64`, `dtherm`, `dts`, `erms`, `est`,
+`extapic`, `f16c`, `fdp_excptn_only`, `flushbyasid`, `flush_l1d`, `fma`, `fma4`,
+`fpu`, `fsgsbase`, `fsrm`, `fxsr`, `fxsr_opt`, `gfni`, `hle`, `ht`, `hwp`,
+`hwp_act_window`, `hwp_epp`, `hwp_notify`, `hwp_pkg_req`, `hypervisor`, `ia64`,
+`ibs`, `ida`, `intel_pt`, `intel_stibp`, `invpcid`, `irperf`, `la57`, `lahf_lm`,
+`lbrv`, `lm`, `longrun`, `lrti`, `lwp`, `mca`, `mce`, `md_clear`, `misalignsse`,
+`mmx`, `mmxext`, `monitor`, `movbe`, `movdir64b`, `movdiri`, `mp`, `mpx`, `msr`,
+`mtrr`, `mwaitx`, `nodeid_msr`, `npt`, `nrip_save`, `nx`, `ospke`, `osvw`,
+`osxsave`, `overflow_recov`, `pae`, `pat`, `pausefilter`, `pbe`, `pcid`,
 `pclmulqdq`, `pconfig`, `pdcm`, `pdpe1gb`, `perfctr_core`, `perfctr_llc`,
 `perfctr_nb`, `pfthreshold`, `pge`, `phe`, `phe_en`, `pku`, `pln`, `pmm`,
 `pmm_en`, `pn`, `pni`, `popcnt`, `pse`, `pse36`, `pts`, `ptsc`, `rdpid`,
-`rdrand`, `rdseed`, `rdt_a`, `rdtscp`, `recovery`, `rng`, `rng_en`, `rtm`,
-`sdbg`, `sep`, `sha_ni`, `skinit`, `smap`, `smca`, `smep`, `smx`, `ss`, `sse`,
-`sse2`, `sse4_1`, `sse4_2`, `sse4a`, `ssse3`, `succor`, `svm`, `svm_lock`,
-`syscall`, `tbm`, `tce`, `tm`, `tm2`, `tme`, `topoext`, `tsc`, `tsc_adjust`,
-`tsc_deadline_timer`, `tsc_scale`, `umip`, `vaes`, `vgif`, `virt_ssbd`,
-`vmcb_clean`, `vme`, `vmx`, `vpclmulqdq`, `v_vmsave_vmload`, `waitpkg`,
-`wbnoinvd`, `wdt`, `x2apic`, `xgetbv1`, `xop`, `xsave`, `xsavec`, `xsaveerptr`,
-`xsaveopt`, `xsaves`, `xtpr`
+`rdpru`, `rdrand`, `rdseed`, `rdt_a`, `rdtscp`, `recovery`, `rng`, `rng_en`,
+`rtm`, `sdbg`, `sep`, `sha_ni`, `skinit`, `smap`, `smca`, `smep`, `smx`,
+`spec_ctrl`, `spec_ctrl_ssbd`, `ss`, `sse`, `sse2`, `sse4_1`, `sse4_2`, `sse4a`,
+`ssse3`, `succor`, `svm`, `svm_lock`, `syscall`, `tbm`, `tce`, `tm`, `tm2`,
+`tme`, `topoext`, `tsc`, `tsc_adjust`, `tsc_deadline_timer`, `tsc_scale`,
+`tsx_force_abort`, `umip`, `vaes`, `vgif`, `virt_ssbd`, `vmcb_clean`, `vme`,
+`vmx`, `vpclmulqdq`, `v_vmsave_vmload`, `waitpkg`, `wbnoinvd`, `wdt`, `x2apic`,
+`xgetbv1`, `xop`, `xsave`, `xsavec`, `xsaveerptr`, `xsaveopt`, `xsaves`, `xtpr`,
+`zero_fcs_fds`
+
+In addition:
+* `xsavearea=SIZE` can be used to set the xsave area size.
+* `leaf_subleaf_reg_bit` can be used to mask unknown features. e.g., `7_1_ecx_12`).
+   There is a limitation that only known CPUID leaves are supported.
 
 ## License
 
