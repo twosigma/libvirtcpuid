@@ -74,7 +74,7 @@ def get_cpu_brand(path):
     try:
         brand = "unknown"
         family = "unknown"
-        result = subprocess.Popen(["{}/../cpuid".format(script_dir()), '-f', path],
+        result = subprocess.Popen(["cpuid".format(script_dir()), '-f', path],
                                   stdout=subprocess.PIPE, universal_newlines=True)
         stdout, stderr = result.communicate()
         for line in stdout.split("\n"):
