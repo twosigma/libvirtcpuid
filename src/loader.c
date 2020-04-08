@@ -97,9 +97,9 @@ static void read_all(int fd, char* buf, size_t len)
 }
 
 /* XXX returns a string on the heap */
-static char *_unique_env_append(const char *name, const char *new_env, const char *sep)
+static char *unique_env_append(const char *name, const char *new_env, const char *sep)
 {
-    char *prev_env = getenv(name);
+    char *prev_env = secure_getenv(name);
     if (!prev_env)
         return xstrdup(new_env);
 
@@ -148,18 +148,6 @@ static char *_unique_env_append(const char *name, const char *new_env, const cha
     return uenv;
 }
 
-static char *unique_env_append(const char *name, const char *new_env, const char *sep)
-{
-    char *new_value = _unique_env_append(name, new_env, sep);
-    char *ret;
-
-    if (asprintf(&ret, "%s=%s", name, new_value) < 0)
-        oom();
-
-    free(new_value);
-    return ret;
-}
-
 /* This does not include the NULL entry */
 static int num_auxv_entries(size_t *auxv)
 {
@@ -175,33 +163,31 @@ static int num_pointers(char **envp)
     return i;
 }
 
-#define GET_VAR_VALUE(tok, key) (                \
-    !strncmp(tok, key "=", sizeof(key "=")-1) ?  \
-       &tok[sizeof(key "=")-1] : NULL            \
-)
-
 static void inject_env_vars_heap(char *conf)
 {
     char *saveptr;
-    char *value;
 
-    for (char *tok = strtok_r(conf, "\n", &saveptr); tok; tok = strtok_r(NULL, "\n", &saveptr)) {
-        if (!strchr(tok, '='))
-            err(1, "Incorrect env var: %s", tok);
-        char *var = tok;
+    for (char *var = strtok_r(conf, "\n", &saveptr); var; var = strtok_r(NULL, "\n", &saveptr)) {
+        char *value;
+        char *eq = strchr(var, '=');
 
-        if ((value = GET_VAR_VALUE(tok, "LD_PRELOAD")))
-            var = unique_env_append("LD_PRELOAD", value, ":");
-        else if ((value = GET_VAR_VALUE(tok, "VIRT_CPUID_MASK")))
-            var = unique_env_append("VIRT_CPUID_MASK", value, ",");
-        else
-            var = xstrdup(tok);
+        if (!eq)
+            err(1, "Incorrect env var: %s", var);
+        *eq = '\0';
+        value = eq+1;
+
+        /* Now, var and value point to a proper env var */
+
+        if (!strcmp(var, "LD_PRELOAD"))
+            value = unique_env_append("LD_PRELOAD", value, ":");
+        else if (!strcmp(var, "VIRT_CPUID_MASK"))
+            value = unique_env_append("VIRT_CPUID_MASK", value, ",");
 
         /*
-         * Note that putenv() relocates the environ array on the heap,
+         * Note that setenv() relocates the environ array on the heap,
          * but that's fine as we copy it back on the stack later.
          */
-        putenv(var);
+        setenv(var, value, 1);
     }
 }
 
@@ -225,7 +211,21 @@ static char *get_inject_env_file_content(void)
     return conf;
 }
 
-static void inject_env_vars(size_t *sp)
+
+static void init_libc(char **envp, size_t *auxv)
+{
+    size_t aux[AUX_CNT];
+
+    __progname = LIB_NAME;
+    __environ = envp;
+
+    decode_vec(auxv, aux, AUX_CNT);
+    libc.page_size = aux[AT_PAGESZ];
+    libc.secure = ((aux[0]&0x7800)!=0x7800 || aux[AT_UID]!=aux[AT_EUID]
+                   || aux[AT_GID]!=aux[AT_EGID] || aux[AT_SECURE]);
+}
+
+void __dls3(size_t *sp)
 {
     /*
      * We do the following:
@@ -247,31 +247,41 @@ static void inject_env_vars(size_t *sp)
      *
      * Note: In the following, we free() pointers, but it doesn't matter,
      * because we'll use brk() to reset the heap, and never use our malloc
-     * again.
+     * again. Note that we need malloc() because we use setenv().
      */
 
     int argc = *sp;
-    size_t *auxv;
     char **argv = (void *)(sp+1);
     char **envp = argv+argc+1;
+    size_t *auxv;
     int i;
 
     uintptr_t orig_brk = __syscall(SYS_brk, 0);
 
-    __progname = LIB_NAME;
-    __environ = envp;
     for (i=argc+1; argv[i]; i++);
     auxv = (void *)(argv+i+1);
 
-    if (getenv("LD_ENV_DISABLE"))
-        return;
+    init_libc(envp, auxv);
+
+    if (secure_getenv("LD_ENV_DISABLE"))
+        stage4(sp); /* Never returns */
+
+    if (libc.secure) {
+        /*
+         * In setuid mode, we don't accept VIRT variables from the regular
+         * environment, only from the LD_INJECT_ENV_PATH file.
+         * Can't use secure_getenv() in cpuid.c, otherwise we won't get what
+         * we have in the inject-env file.
+         */
+        unsetenv("VIRT_CPUID_MASK");
+        unsetenv("VIRT_CPUID_DEBUG");
+    }
 
     char *conf = get_inject_env_file_content();
-    if (!conf)
-        return;
-
-    inject_env_vars_heap(conf);
-    free(conf);
+    if (conf) {
+        inject_env_vars_heap(conf);
+        free(conf);
+    }
 
     /* Relocate heap allocated environment variables on the stack */
     for (char **var = environ; *var; var++) {
@@ -312,6 +322,7 @@ static void inject_env_vars(size_t *sp)
     /*
      * XXX at this point, malloc should no longer be used. we hand off the
      * heap region to the interposed libc.
+     * Note, we forever leak the other stack variables we have in our frame.
      */
     stage4((void *)&new);
 }
@@ -322,7 +333,7 @@ static void stage4(size_t *sp)
      * Install the SIGSEGV signal handler and enable faulting on the CPUID
      * instruction.
      */
-    cpuid_init();
+    cpuid_init(libc.secure);
 
     /* And finally load and jump to the interposed libc loader */
     int fd = open(INTERPOSED_LD_PATH, O_RDONLY);
@@ -337,10 +348,4 @@ static void stage4(size_t *sp)
 
     CRTJMP(laddr(&dso, ehdr->e_entry), sp);
     for(;;);
-}
-
-void __dls3(size_t *sp)
-{
-    inject_env_vars(sp);
-    stage4(sp);
 }

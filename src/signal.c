@@ -212,7 +212,7 @@ static void libvirtcpuid_init_dso(void)
     /*
      * Enable CPUID faulting if the loader hasn't done it already.
      */
-    cpuid_init();
+    cpuid_init(false);
 
     /*
      * As we are a shared library, we can interpose on sigaction to

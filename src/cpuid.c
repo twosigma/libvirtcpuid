@@ -43,7 +43,23 @@
  */
 
 static bool emit_debug;
-#define debug(s, ...) ({ if (emit_debug) warnx(s, ##__VA_ARGS__); })
+static bool suppress_output;
+
+#define debug(s, ...) ({ if (emit_debug && !suppress_output) warnx(s, ##__VA_ARGS__); })
+
+#define secure_err(exit_code, fmt, ...) ({  \
+    if (suppress_output)                    \
+        exit(exit_code);                    \
+    else                                    \
+        err(exit_code, fmt, ##__VA_ARGS__); \
+})
+
+#define secure_errx(exit_code, fmt, ...) ({  \
+    if (suppress_output)                     \
+        exit(exit_code);                     \
+    else                                     \
+        errx(exit_code, fmt, ##__VA_ARGS__); \
+})
 
 uint32_t xsavearea_size = -1;
 uint32_t cpuid_mask[NCAPINTS];
@@ -106,7 +122,7 @@ static void enable_feature_mask(const char *name)
     if (feature == -1) {
         if (!strcmp(name, "help"))
             show_help_and_die();
-        errx(1, "Unrecognized cpu feature flag: %s", name);
+        secure_errx(1, "Unrecognized cpu feature flag: %s", name);
     }
 
     mask_cpuid_feature(feature);
@@ -169,8 +185,8 @@ static void virtualize_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_regs 
     if (leaf == 0x0d && subleaf == 0 && xsavearea_size != -1) {
         debug("Overriding xsavearea=%d", xsavearea_size);
         if (regs->ebx && xsavearea_size && regs->ebx > xsavearea_size)
-            errx(1, "xsavearea_size is too small."
-                 "It should be at least %d bytes", regs->ebx);
+            secure_errx(1, "xsavearea_size is too small."
+                        "It should be at least %d bytes", regs->ebx);
 
         regs->ebx = xsavearea_size;
         regs->ecx = xsavearea_size;
@@ -213,11 +229,11 @@ static void cpuid_handle_trap(void *uctx)
      * Disabling CPUID faulting temporarily for the current thread.
      */
     if (arch_prctl(ARCH_SET_CPUID, 1) < 0)
-        err(1, "Failed to disable CPUID faulting");
+        secure_err(1, "Failed to disable CPUID faulting");
 
     cpuid(leaf, subleaf, &regs.eax, &regs.ebx, &regs.ecx, &regs.edx);
     if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
-        err(1, "Failed to re-enable CPUID faulting");
+        secure_err(1, "Failed to re-enable CPUID faulting");
 
     virtualize_cpuid(leaf, subleaf, &regs);
 
@@ -255,17 +271,25 @@ static void setup_sigsegv_cpuid_handler(void)
     };
 
     if (sigaction(SIGSEGV, &sa, NULL) < 0)
-        err(1, "Failed to register SIGSEGV handler");
+        secure_err(1, "Failed to register SIGSEGV handler");
 
     sigset_t sigset;
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGSEGV);
     if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) < 0)
-        err(1, "Failed to unblock SIGSEGV");
+        secure_err(1, "Failed to unblock SIGSEGV");
 }
 
-void cpuid_init(void)
+void cpuid_init(bool secure)
 {
+    /*
+     * When we are running in secure mode (setuid), only what is set in the
+     * LD_INJECT_ENV_PATH file is visible, not the regular environment.
+     * and so using getenv() here is safe.
+     *
+     * TODO LD_PRELOAD is ignored for setuid programs. We should preload our
+     * libvirtcpuid.so even in setuid programs to protect our SIGSEGV handler.
+     */
     emit_debug = getenv("VIRT_CPUID_DEBUG");
 
     char *conf = getenv("VIRT_CPUID_MASK");
@@ -279,7 +303,7 @@ void cpuid_init(void)
 
     bool faulting_disabled;
     if ((faulting_disabled = arch_prctl(ARCH_GET_CPUID, 0)) < 0)
-        err(1, "CPUID faulting feature inaccessible");
+        secure_err(1, "CPUID faulting feature inaccessible");
 
     /*
      * When the DSO loads, it calls cpuid_init(). This is to support
@@ -293,5 +317,13 @@ void cpuid_init(void)
     setup_sigsegv_cpuid_handler();
 
     if (arch_prctl(ARCH_SET_CPUID, 0) < 0)
-        err(1, "Failed to enable CPUID faulting");
+        secure_err(1, "Failed to enable CPUID faulting");
+
+    /*
+     * For secure programs, we don't want to emit output past the
+     * initialization phase. This is to prevent an attacker to write to
+     * stderr if it gets re-opened by our current process.
+     */
+    if (secure)
+        suppress_output = true;
 }
