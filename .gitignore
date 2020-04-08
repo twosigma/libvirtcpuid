@@ -14,3 +14,4 @@ cpuid_tool/cpuid-*/cpuinfo2cpuid.man
 cpuid_tool/cpuid-*/cpuinfo2cpuid.man.gz
 cpuid
 src/config.h
+*.tar.gz
