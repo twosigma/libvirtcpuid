@@ -3,6 +3,8 @@
  * - arch/x86/kvm/cpuid.h
  */
 
+/* SPDX-License-Identifier: GPL-2.0 */
+
 struct cpuid_regs {
 	uint32_t eax, ebx, ecx, edx;
 };

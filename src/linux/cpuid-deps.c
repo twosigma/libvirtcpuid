@@ -3,6 +3,7 @@
  * - arch/x86/kernel/cpu/cpuid-deps.c
  */
 
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Declare dependencies between CPUIDs */
 
 struct cpuid_dep {
