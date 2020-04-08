@@ -58,7 +58,7 @@ TARGET_FEATURES_JSON_GEN = lcd_mask/features_gen
 OBJECTS_LD = build/ld/loader.o \
 	     build/ld/cpuid.o
 
-OBJECTS_DSO = build/dso/signal.o \
+OBJECTS_DSO = build/dso/dso_signal.o \
 	      build/dso/cpuid.o
 
 OBJECTS_LCD_MASK_FEATURES_GEN = lcd_mask/features_gen.o
