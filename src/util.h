@@ -23,5 +23,7 @@
 #define LIB_MAIN __attribute__((constructor))
 
 #define LIB_NAME "libvirtcpuid"
+#define SUPPORT_URL "https://github.com/twosigma/libvirtcpuid/issues/new"
+#define SUPPORT_TEXT "Let us know at " SUPPORT_URL " and we'll take a look."
 
 #endif

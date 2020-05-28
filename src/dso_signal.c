@@ -37,6 +37,12 @@
  * The goal of this DSO is to protect the signal handler the loader has setup.
  */
 
+/* As a DSO, we need to announce our library name in the error messages */
+#define warnx(fmt, ...)        warnx(LIB_NAME": " fmt, ##__VA_ARGS__)
+#define errx(status, fmt, ...) errx(status, LIB_NAME": " fmt, ##__VA_ARGS__)
+#define warn(fmt, ...)         warn(LIB_NAME": " fmt, ##__VA_ARGS__)
+#define err(status, fmt, ...)  err(status, LIB_NAME": " fmt, ##__VA_ARGS__)
+
 static int (*real_sigaction)(int signum, const struct sigaction *act, struct sigaction *oldact);
 
 typedef bool (*chainable_sighandler)(int signal, siginfo_t *info, void *ucontext);
@@ -46,7 +52,12 @@ static struct sigaction cpuid_sa;
 static struct sigaction real_sa = {.sa_handler = SIG_DFL};
 bool is_sigsegv_masked;
 
-static bool init_done;
+static bool symbols_init_done;
+
+#define ENSURE_INIT() ({ \
+    if (!symbols_init_done) \
+        errx(1, "%s() was called before initialization. " SUPPORT_TEXT, __FUNCTION__); \
+})
 
 static void fatal_sigsegv(void)
 {
@@ -92,6 +103,8 @@ static void sigsegv_handler(int signal, siginfo_t *info, void *ucontext)
 LIB_EXPORT
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
+    ENSURE_INIT();
+
     if (signum != SIGSEGV)
         return real_sigaction(signum, act, oldact);
 
@@ -111,6 +124,14 @@ int sigprocmask(int how, const sigset_t *_set, sigset_t *oldset)
     bool _is_sigsegv_masked = is_sigsegv_masked;
 
     const sigset_t *set = _set;
+
+    /*
+     * It is tempting to call dlsym(), but it's not a good idea. sigprocmask()
+     * could be called from a signal handler, and dlsym() could call malloc(),
+     * leading to a deadlock. We prefer to abort if we haven't resolved
+     * the real sigprocmask().
+     */
+    ENSURE_INIT();
 
     /* We don't want the application to mask SIGSEGV */
 
@@ -185,16 +206,18 @@ static void *(*real_dlsym)(void *handle, const char *symbol);
 LIB_EXPORT
 void *dlsym(void *handle, const char *symbol)
 {
-    /*
-     * Note: here we use __builtin_return_address, using dlsym would
-     * not work as another library might be hijacking it.
-     */
-    if (!real_dlsym)
-        real_dlsym = _dl_sym(RTLD_NEXT, "dlsym",
-                             __builtin_return_address(0));
+    if (!real_dlsym) {
+        /*
+         * dlsym() needs an base address to lookup the next symbol.
+         * We provide __builtin_return_address(0) as opposed to the address of
+         * the dlsym function. That's because the dlsym symbol may correspond
+         * to another library's dlsym (e.g., libvirttime).
+         */
+        real_dlsym = _dl_sym(RTLD_NEXT, "dlsym", __builtin_return_address(0));
+    }
 
     /* The JVM gets sigaction via dlsym */
-    if (!strcmp(symbol, "sigaction") && init_done)
+    if (!strcmp(symbol, "sigaction") && symbols_init_done)
         return sigaction;
     return real_dlsym(handle, symbol);
 }
@@ -202,12 +225,9 @@ void *dlsym(void *handle, const char *symbol)
 LIB_MAIN
 static void libvirtcpuid_init_dso(void)
 {
-    /*
-     * XXX if an other library init code calls sigaction() before
-     * our init function, we'll crash. It's easy to fix though.
-     */
     real_sigaction = dlsym(RTLD_NEXT, "sigaction");
     real_sigprocmask = dlsym(RTLD_NEXT, "sigprocmask");
+    symbols_init_done = true;
 
     /*
      * Enable CPUID faulting if the loader hasn't done it already.
@@ -219,6 +239,4 @@ static void libvirtcpuid_init_dso(void)
      * protect the SIGSEGV handler we installed.
      */
     protect_sigsegv_cpuid_handler();
-
-    init_done = true;
 }
