@@ -263,7 +263,7 @@ void __dls3(size_t *sp)
 
     init_libc(envp, auxv);
 
-    if (secure_getenv("LD_ENV_DISABLE"))
+    if (getenv("LD_ENV_DISABLE"))
         stage4(sp); /* Never returns */
 
     if (libc.secure) {
