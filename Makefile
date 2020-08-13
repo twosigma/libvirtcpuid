@@ -72,7 +72,7 @@ build/dso:
 	mkdir -p $@
 
 $(MUSL_ARCHIVE):
-	wget https://www.musl-libc.org/releases/$@
+	wget https://musl.libc.org/releases/$@
 
 musl: $(MUSL_ARCHIVE)
 	rm -rf musl.tmp
