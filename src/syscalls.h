@@ -21,12 +21,12 @@
 
 #include <sys/syscall.h>
 
-static inline int tgkill(int tgid, int tid, int sig)
+static inline int _tgkill(int tgid, int tid, int sig)
 {
     return syscall(SYS_tgkill, tgid, tid, sig);
 }
 
-static inline int gettid(void)
+static inline int _gettid(void)
 {
     return syscall(SYS_gettid);
 }

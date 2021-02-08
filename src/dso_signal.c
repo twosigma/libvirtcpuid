@@ -66,7 +66,7 @@ static void fatal_sigsegv(void)
         err(1, "Failed to change SIGSEGV signal handler");
 
     /* Signal is fatal, so just re-raise it */
-    tgkill(getpid(), gettid(), SIGSEGV);
+    _tgkill(getpid(), _gettid(), SIGSEGV);
     for(;;);
 }
 
