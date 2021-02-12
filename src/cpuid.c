@@ -353,7 +353,7 @@ void cpuid_init(bool secure)
      * TODO LD_PRELOAD is ignored for setuid programs. We should preload our
      * libvirtcpuid.so even in setuid programs to protect our SIGSEGV handler.
      */
-    emit_debug = getenv("VIRT_CPUID_DEBUG");
+    emit_debug = !!getenv("VIRT_CPUID_DEBUG");
 
     char *conf = getenv("VIRT_CPUID_MASK");
     if (!conf) {
