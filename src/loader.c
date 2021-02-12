@@ -304,7 +304,7 @@ void __dls3(size_t *sp)
      * placed contiguously on the stack. It is what an ELF interpreter
      * expects.
      */
-    struct __attribute__((packed)) {
+    struct __attribute__((aligned(sizeof(void *)), packed)) {
         size_t argc;
         char *argv[argc+1];
         char *envp[num_pointers(environ)+1];
