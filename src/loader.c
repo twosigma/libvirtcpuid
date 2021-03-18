@@ -63,7 +63,7 @@
  */
 LIB_EXPORT void __dls2b(size_t *sp);
 LIB_EXPORT void __dls3(size_t *sp);
-static void stage4(size_t *sp);
+static void stage4(size_t *sp, size_t *auxv);
 
 static void oom(void)
 {
@@ -264,7 +264,7 @@ void __dls3(size_t *sp)
     init_libc(envp, auxv);
 
     if (getenv("LD_ENV_DISABLE"))
-        stage4(sp); /* Never returns */
+        stage4(sp, auxv); /* Never returns */
 
     if (libc.secure) {
         /*
@@ -324,10 +324,40 @@ void __dls3(size_t *sp)
      * heap region to the interposed libc.
      * Note, we forever leak the other stack variables we have in our frame.
      */
-    stage4((void *)&new);
+    stage4((void *)&new, new.auxv);
 }
 
-static void stage4(size_t *sp)
+static void fixup_elf_auxv(size_t *auxv, struct dso *ld_dso, Ehdr *ld_header)
+{
+    size_t at_base;
+    if (search_vec(auxv, &at_base, AT_BASE) && !at_base) {
+        // AT_BASE==0: The ELF interpreter has been invoked as the program.
+        for (size_t *p = auxv; p[0]; p += 2) {
+            switch (p[0]) {
+            case AT_PHDR:
+                p[1] = (size_t)laddr(ld_dso, ld_header->e_phoff);
+                break;
+            case AT_PHENT:
+                p[1] = (size_t)ld_header->e_phnum;
+                break;
+            case AT_ENTRY:
+                p[1] = (size_t)laddr(ld_dso, ld_header->e_entry);
+                break;
+            }
+        }
+    } else {
+        // The ELF interpreter is invoked to load another program.
+        for (size_t *p = auxv; p[0]; p += 2) {
+            switch (p[0]) {
+            case AT_BASE:
+                p[1] = (size_t)laddr(ld_dso, 0);
+                break;
+            }
+        }
+    }
+}
+
+static void stage4(size_t *sp, size_t *auxv)
 {
     /*
      * Install the SIGSEGV signal handler and enable faulting on the CPUID
@@ -340,12 +370,14 @@ static void stage4(size_t *sp)
     if (fd < 0)
         err(1, "Can't open %s", INTERPOSED_LD_PATH);
 
-    struct dso dso;
-    Ehdr *ehdr = map_library(fd, &dso);
-    if (!ehdr)
+    struct dso ld_dso;
+    Ehdr *ld_header = map_library(fd, &ld_dso);
+    if (!ld_header)
         errx(1, "Can't load %s", INTERPOSED_LD_PATH);
     close(fd);
 
-    CRTJMP(laddr(&dso, ehdr->e_entry), sp);
+    fixup_elf_auxv(auxv, &ld_dso, ld_header);
+
+    CRTJMP(laddr(&ld_dso, ld_header->e_entry), sp);
     for(;;);
 }
