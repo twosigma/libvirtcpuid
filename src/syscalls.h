@@ -19,6 +19,7 @@
 #ifndef __SYSCALLS_H__
 #define __SYSCALLS_H__
 
+#include <unistd.h>
 #include <sys/syscall.h>
 
 static inline int _tgkill(int tgid, int tid, int sig)
