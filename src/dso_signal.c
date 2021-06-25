@@ -203,7 +203,7 @@ static void protect_sigsegv_cpuid_handler(void)
 extern void *_dl_sym (void *handle, const char *name, void *who);
 
 static void *(*real_dlsym)(void *handle, const char *symbol);
-LIB_EXPORT
+LIB_EXPORT __attribute__((noinline))
 void *dlsym(void *handle, const char *symbol)
 {
     if (!real_dlsym) {
