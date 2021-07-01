@@ -249,5 +249,7 @@ In addition:
 
 ## License
 
-The code is licensed under the GPLv2 license.
+The code is licensed under the GPLv2 license, except the code under lcd_mask/*
+which is licensed under the Apache license.
+
 It contains sources of Linux (GPLv2), and musl (MIT).
