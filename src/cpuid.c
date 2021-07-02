@@ -364,7 +364,7 @@ void cpuid_init(bool secure)
     if (!strcmp(conf, "help"))
         show_help_and_die();
 
-    bool faulting_disabled;
+    int faulting_disabled;
     if ((faulting_disabled = arch_prctl(ARCH_GET_CPUID, 0)) < 0)
         secure_err(1, "CPUID faulting feature inaccessible");
 
