@@ -195,32 +195,6 @@ static void protect_sigsegv_cpuid_handler(void)
         err(1, "Failed to get original SIGSEGV handler");
 }
 
-/*
- * We can't get the real_dlsym via dlsym, as are overriding it.
- * So we use an internal libc function.
- * Is this a pile of hacks? yes. Does it work? yes.
- */
-extern void *_dl_sym (void *handle, const char *name, void *who);
-
-static void *(*real_dlsym)(void *handle, const char *symbol);
-LIB_EXPORT
-void *dlsym(void *handle, const char *symbol)
-{
-    if (!real_dlsym) {
-        /*
-         * dlsym() needs an base address to lookup the next symbol.
-         * We provide __builtin_return_address(0) as opposed to the address of
-         * the dlsym function. That's because the dlsym symbol may correspond
-         * to another library's dlsym (e.g., libvirttime).
-         */
-        real_dlsym = _dl_sym(RTLD_NEXT, "dlsym", __builtin_return_address(0));
-    }
-
-    /* The JVM gets sigaction via dlsym */
-    if (!strcmp(symbol, "sigaction") && symbols_init_done)
-        return sigaction;
-    return real_dlsym(handle, symbol);
-}
 
 LIB_MAIN
 static void libvirtcpuid_init_dso(void)
