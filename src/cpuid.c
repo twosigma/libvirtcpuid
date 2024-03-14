@@ -258,6 +258,20 @@ static void virtualize_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_regs 
         regs->ecx = xsavearea_size;
     }
 
+	/* Virtualize the CPUID brand string */
+	char *envmodel = getenv("VIRT_CPUID_BRAND");
+	if (envmodel != NULL && leaf >= 0x80000002 && leaf <= 0x80000004)
+	{
+		static char model[12*4+1] = {0};
+		strncpy(model, envmodel, 12*4);
+
+		uint32_t offset = (leaf-0x80000002)*16;
+		memcpy(&regs->eax, model+offset+0, 4);
+		memcpy(&regs->ebx, model+offset+4, 4);
+		memcpy(&regs->ecx, model+offset+8, 4);
+		memcpy(&regs->edx, model+offset+12, 4);
+	}
+
     for (i = get_next_matching_leaf_index(leaf, subleaf, 0); i >= 0;
          i = get_next_matching_leaf_index(leaf, subleaf, i+1)) {
         switch (reverse_cpuid[i].reg) {
