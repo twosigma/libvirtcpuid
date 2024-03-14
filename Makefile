@@ -81,7 +81,7 @@ musl: $(MUSL_ARCHIVE)
 	mv musl.tmp musl
 
 musl/lib/libc.a: musl
-	cd musl && ./configure --disable-shared
+	cd musl && CFLAGS=-fPIC ./configure --disable-shared
 	+make -C musl
 
 $(TARGET_LD): $(OBJECTS_LD) musl/lib/libc.a

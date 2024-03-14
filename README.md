@@ -46,6 +46,9 @@ examples describe some typical issues encountered without CPUID virtualization:
   We can use `libvirtcpuid` to make CPUID report a larger XSAVE area on the
   original host to ensure successful migration to hosts with larger XSAVE areas.
 
+* Suppose an operating system requires a certain processor model even though it
+  will work fine with older CPU models.
+
 ## Usage
 
 ### Compilation
@@ -70,6 +73,7 @@ compilation with `make INTERPOSED_LD_PATH=/path/to/ld-orig.so`.
 ```bash
 LD_PRELOAD=/path/to/libvirtcpuid.so
 VIRT_CPUID_MASK=avx512f,hle,rtm,xsavearea=2696
+VIRT_CPUID_BRAND='My Fake CPU Model'
 ```
 
 Note that the path of the injected environment variables can be configured during
@@ -97,6 +101,7 @@ patchelf --set-interpreter /path/to/ld-virtcpuid.so /path/to/some-program
 If the two previous options are not possible, run your program with:
 
 ```bash
+export VIRT_CPUID_BRAND='My Fake CPU Model'
 LD_PRELOAD=/path/to/libvirtcpuid.so VIRT_CPUID_MASK=avx512f,hle,rtm,xsavearea=2696 some-program
 ```
 
